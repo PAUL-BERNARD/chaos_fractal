@@ -25,7 +25,7 @@ fn draw_points_u8(x: u32, y: u32) -> u32 {
     var vertices_y = array(1024u, 1745u, 1922u, 1424u, 624u, 126u, 303u);
 
     var val: u32 = 0u;
-    for (var i:u32 = 0u; i < 7u; i++) {
+    for (var i:u32 = 0u; i < 5u; i++) {
         if (2u*x >= vertices_x[i] && 2u*y >= vertices_y[i]) {
             val += get_value_at(
                 x + x - vertices_x[i],
@@ -34,8 +34,7 @@ fn draw_points_u8(x: u32, y: u32) -> u32 {
         }
     }
 
-    // if (val > 0u) { return 255u;} else {return 0u;}
-    return min(val/7u, 255u);
+    return min(val/5u, 255u);
 }
 
 fn draw_points_u32(x: u32, y: u32) -> u32 {
@@ -46,8 +45,17 @@ fn draw_points_u32(x: u32, y: u32) -> u32 {
         (draw_points_u8(x, 4u*y+3u) << 24u) ;
 }
 
+fn draw_xd(x: u32, y: u32) -> u32 {
+    return
+        0u +
+        (100u << 8u ) +
+        (200u << 16u) +
+        (255u << 24u) ;
+}
+
 @compute
 @workgroup_size(8,8)
 fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
-    result[global_id.x*512u + global_id.y] = draw_points_u32(global_id.x, global_id.y);
+    // result[global_id.x*512u + global_id.y] = draw_points_u32(global_id.x, global_id.y);
+    result[global_id.x*512u + global_id.y] = draw_xd(global_id.x, global_id.y);
 }
