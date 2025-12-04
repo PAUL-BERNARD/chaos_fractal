@@ -9,5 +9,8 @@ edition = "2021"
 ffmpeg-next = '*'
 fastrand = "*"
 
+wgpu = "*"
+tokio = { version = "1.25.0", features = ["rt", "macros"] }
+
 [profile.release]
 debug = true
