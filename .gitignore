@@ -1,0 +1,5 @@
+/target
+encode_decode.c
+Cargo.lock
+.vscode/
+*.png
