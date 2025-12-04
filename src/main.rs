@@ -2,49 +2,45 @@ use ffmpeg::codec::traits::Encoder;
 use ffmpeg_next as ffmpeg;
 use rand::{self, Rng};
 
+
 fn intermediate(p1 : [usize; 2], p2 : [usize; 2]) -> [usize; 2] {
-    return [(2*p1[0]+p2[0])/3, (2*p1[1]+p2[1])/3];
+    return [(p1[0]+p2[0])/2, (p1[1]+p2[1])/2];
 }
 
 
 fn main() {
-    const IMAGE_SIZE : usize = 2187;
-    const POINTS : [[usize; 2]; 4] = [[0, 0], [2187, 0], [0, 2187], [2187, 2187]];
-    const ITER : usize = 100_000_000;
-
-    let mut image : [u8; IMAGE_SIZE*IMAGE_SIZE] = [0u8; IMAGE_SIZE * IMAGE_SIZE];
-    let mut cursor = [IMAGE_SIZE/2, IMAGE_SIZE/2];
-
-    let mut rng = rand::thread_rng();
-
-    for _i in 0..ITER {
-        image[cursor[0]*IMAGE_SIZE+cursor[1]] = 
-            image[cursor[0]*IMAGE_SIZE+cursor[1]]
-            .checked_add(1)
-            .unwrap_or(u8::MAX);
-
-        cursor = intermediate(cursor, POINTS[rng.gen_range(0..POINTS.len())]);
-    }
-    println!("Finished creating fractal ! XDD");
-
-
-    ///////// FFMPEG
-
-    ffmpeg::init().unwrap();
-
+    const IMAGE_SIZE : usize = 2000;
+    const POINTS : [[usize; 2]; 5] = [[100, 1000], [722, 1856], [1728, 1529], [1728, 471], [722, 144]];
+    const ITER : usize = 15_000_000;
     const OUTPUT_FILE : &str = "./FRACTAL.png";
 
+    ffmpeg::init().unwrap();
 
     let mut video_frame = ffmpeg::util::frame::video::Video::new(
         ffmpeg::format::Pixel::GRAY8,
         IMAGE_SIZE.try_into().unwrap(),
         IMAGE_SIZE.try_into().unwrap()
     );
-    video_frame.data_mut(0).copy_from_slice(&image);
-    // println!("{:?}",video_frame.data(0).into_iter().step_by(100).collect::<Vec<&u8>>());
+    video_frame.set_pts(Some(0));
+
+    let stride = video_frame.stride(0);
+    let image = video_frame.data_mut(0);
+
+    let mut cursor = [IMAGE_SIZE/2, IMAGE_SIZE/2];
+
+    let mut rng = rand::thread_rng();
+
+    for _i in 0..ITER {
+        image[cursor[0]*stride + cursor[1]] = 
+            image[cursor[0]*stride + cursor[1]]
+                .checked_add(1)
+                .unwrap_or(u8::MAX);
+
+        cursor = intermediate(cursor, POINTS[rng.gen_range(0..POINTS.len())]);
+    }
 
     let mut output_ctx = ffmpeg::format::output(&OUTPUT_FILE)
-        .expect("Couldn't create output context !!");
+        .unwrap();
 
     let _ = output_ctx.add_stream(ffmpeg::encoder::find(ffmpeg::codec::Id::PNG).unwrap()).unwrap();
 
