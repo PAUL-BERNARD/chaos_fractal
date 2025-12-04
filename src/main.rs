@@ -1,6 +1,6 @@
 use ffmpeg::codec::traits::Encoder;
 use ffmpeg_next as ffmpeg;
-use rand::{self, Rng};
+use fastrand;
 
 
 fn intermediate(p1 : [usize; 2], p2 : [usize; 2]) -> [usize; 2] {
@@ -9,9 +9,9 @@ fn intermediate(p1 : [usize; 2], p2 : [usize; 2]) -> [usize; 2] {
 
 
 fn main() {
-    const IMAGE_SIZE : usize = 2000;
-    const POINTS : [[usize; 2]; 5] = [[100, 1000], [722, 1856], [1728, 1529], [1728, 471], [722, 144]];
-    const ITER : usize = 15_000_000;
+    const IMAGE_SIZE : usize = 1500;
+    const POINTS : [[usize; 2]; 5] = [[75, 750], [541, 1392], [1296, 1147], [1296, 353], [541, 108]];
+    const ITER : usize = 100_000_000;
     const OUTPUT_FILE : &str = "./FRACTAL.png";
 
     ffmpeg::init().unwrap();
@@ -28,15 +28,13 @@ fn main() {
 
     let mut cursor = [IMAGE_SIZE/2, IMAGE_SIZE/2];
 
-    let mut rng = rand::thread_rng();
-
     for _i in 0..ITER {
         image[cursor[0]*stride + cursor[1]] = 
             image[cursor[0]*stride + cursor[1]]
                 .checked_add(1)
                 .unwrap_or(u8::MAX);
 
-        cursor = intermediate(cursor, POINTS[rng.gen_range(0..POINTS.len())]);
+        cursor = intermediate(cursor, POINTS[fastrand::usize(0..POINTS.len())]);
     }
 
     let mut output_ctx = ffmpeg::format::output(&OUTPUT_FILE)
