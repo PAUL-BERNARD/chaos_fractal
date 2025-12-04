@@ -10,9 +10,11 @@ use wgpu::util::DeviceExt;
 use tokio;
 
 
-const IMAGE_SIZE : usize = 512;
-const POINTS : [[usize; 2]; 5] = [[26, 256], [185, 475], [442, 391], [442, 121], [185, 37]];
-const ITER : usize = 10_000_000;
+const IMAGE_SIZE : usize = 2048;
+//const POINTS : [[usize; 2]; 7] = [[102, 1024], [449, 1745], [1229, 1922], [1854, 1424], [1854, 624], [1229, 126], [449, 303]];
+// const POINTS : [[usize; 2]; 4] = [[0, 0], [0, 512], [512, 512], [512, 0]];
+const POINTS : [[usize; 2]; 6] = [[450, 1316], [944, 1564], [822, 1332], [1040, 1738], [1492, 1372], [1294, 522]];
+const ITER : usize = 230_000_000;
 const OUTPUT_FILE : &str = "./FRACTAL.png";
 
 
@@ -31,10 +33,9 @@ async fn main() {
     let stride = dbg!(video_frame.stride(0));
     let image = video_frame.data_mut(0);
     
-    fill_polygon(image, stride);
-    //draw_image_cpu(image, stride);
+    draw_image_cpu(image, stride);
     
-    draw_image_gpu(image, stride).await.unwrap();
+    //draw_image_gpu(image, stride).await.unwrap();
 
     let mut output_ctx = ffmpeg::format::output(&OUTPUT_FILE)
         .unwrap();
@@ -90,22 +91,34 @@ fn in_polygon(x: usize, y: usize) -> bool {
 }
 
 fn draw_image_cpu(image: &mut [u8], stride: usize) {
-    
 
-    let mut cursor = [IMAGE_SIZE/2, IMAGE_SIZE/2];
+    //let mut cursor = [IMAGE_SIZE/2, IMAGE_SIZE/2];
+    let mut cursor = [0, 0];
+    //let mut triangle : bool = false;
 
     for _i in 0..ITER {
-        image[cursor[0]*stride + cursor[1]] = 
+        image[(cursor[0])*stride + cursor[1]] = 
             image[cursor[0]*stride + cursor[1]]
                 .checked_add(1)
                 .unwrap_or(u8::MAX);
 
-        cursor = intermediate(cursor, POINTS[fastrand::usize(0..POINTS.len())]);
+        // cursor = intermediate(cursor, POINTS[fastrand::usize(0..POINTS.len())]);
+        cursor = fern_next(cursor)
     }
 }
 
 fn intermediate(p1 : [usize; 2], p2 : [usize; 2]) -> [usize; 2] {
     return [(p1[0]+p2[0])/2, (p1[1]+p2[1])/2];
+}
+
+fn fern_next([x,y] : [usize; 2]) -> [usize; 2] {
+    let n = fastrand::u8(0..=u8::MAX);
+    match n {
+        0..=2 =>     [1024, 16*y/100+84],
+        3..=200 =>   [162+85*x/100-y*8/100, y*85/100+2*x/100+268],
+        201..=228 => [20*x/100+y*52/100+767, 469+y*22/100-12*x/100],
+        229..=255 => [1233-y*56/100-15*x/100, 284-13*x/100+y*24/100],
+    }
 }
 
 async fn draw_image_gpu(image: &mut [u8], stride: usize) -> Option<()> {
@@ -114,7 +127,7 @@ async fn draw_image_gpu(image: &mut [u8], stride: usize) -> Option<()> {
     // image[stride*(1+IMAGE_SIZE/2) + 1+IMAGE_SIZE/2] = 1;
     // image[stride*(IMAGE_SIZE/2) + 1+IMAGE_SIZE/2] = 1;
     // image.fill(255);
-
+    fill_polygon(image, stride);
 
     // Create default WGPU instance
     let instance = wgpu::Instance::default();
@@ -219,7 +232,7 @@ async fn draw_image_gpu(image: &mut [u8], stride: usize) -> Option<()> {
         label: Some("Command encoder"),
     });
 
-    for i in 0..100 {
+    for i in 0..30 {
         {
             let mut compute_pass = command_encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
                 label: Some(&format!("Compute pass {}", &i)),
