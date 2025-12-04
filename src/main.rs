@@ -142,16 +142,16 @@ async fn draw_image_gpu(image: &mut [u8], stride: usize) -> Option<()> {
         .request_adapter(
             &wgpu::RequestAdapterOptions::default()
         )
-        .await?;
+        .await.ok()?;
 
     let (device, queue) = adapter
         .request_device(
             &wgpu::DeviceDescriptor {
                 label: Some("Device descriptor"),
-                features: wgpu::Features::empty(),
-                limits: wgpu::Limits::downlevel_defaults()
-            },
-            None
+                required_features: wgpu::Features::empty(),
+                required_limits: wgpu::Limits::downlevel_defaults(),
+                .. Default::default()
+            }
         ).await.unwrap();
 
     let image_length = image.len() as wgpu::BufferAddress;
@@ -231,7 +231,9 @@ async fn draw_image_gpu(image: &mut [u8], stride: usize) -> Option<()> {
             push_constant_ranges: &[],
         })),
         module: &shader_module,
-        entry_point: "main",
+        entry_point: Some("main compute pipeline"),
+        compilation_options: Default::default(),
+        cache: None,
     });
 
     let mut command_encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -242,6 +244,7 @@ async fn draw_image_gpu(image: &mut [u8], stride: usize) -> Option<()> {
         {
             let mut compute_pass = command_encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
                 label: Some(&format!("Compute pass {}", &i)),
+                .. Default::default()
             });
 
             compute_pass.set_pipeline(&pipeline);
@@ -276,7 +279,7 @@ async fn draw_image_gpu(image: &mut [u8], stride: usize) -> Option<()> {
         if v.is_err() { println!("{:?}", v) }
     });
 
-    device.poll(wgpu::Maintain::Wait);
+    let _ = device.poll(wgpu::wgt::PollType::Wait { submission_index: None, timeout: None });
 
     let data = buffer_slice.get_mapped_range().to_vec();
 
