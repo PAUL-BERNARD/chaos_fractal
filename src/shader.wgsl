@@ -3,11 +3,11 @@
 
 
 fn get_image_at(x: u32, y: u32) -> u32 {
-    if (x>=512u || y>=512u) {
+    if (x>=2048u || y>=2048u) {
         return 0u;
     }
 
-    return (image[x*128u + (y/4u)] >> (8u*(y%4u))) % 256u;
+    return (image[x*512u + (y/4u)] >> (8u*(y%4u))) % 256u;
 }
 
 fn get_value_at(x: u32, y: u32) -> u32 {
@@ -21,11 +21,11 @@ fn get_value_at(x: u32, y: u32) -> u32 {
 
 
 fn draw_points_u8(x: u32, y: u32) -> u32 {
-    var vertices_x = array(26u, 185u, 442u, 442u, 185u);
-    var vertices_y = array(256u, 475u, 391u, 121u, 37u);
+    var vertices_x = array(102u, 449u, 1229u, 1854u, 1854u, 1229u, 449u);
+    var vertices_y = array(1024u, 1745u, 1922u, 1424u, 624u, 126u, 303u);
 
     var val: u32 = 0u;
-    for (var i:u32 = 0u; i < 5u; i++) {
+    for (var i:u32 = 0u; i < 7u; i++) {
         if (2u*x >= vertices_x[i] && 2u*y >= vertices_y[i]) {
             val += get_value_at(
                 x + x - vertices_x[i],
@@ -35,7 +35,7 @@ fn draw_points_u8(x: u32, y: u32) -> u32 {
     }
 
     // if (val > 0u) { return 255u;} else {return 0u;}
-    return min(val/5u, 255u);
+    return min(val/7u, 255u);
 }
 
 fn draw_points_u32(x: u32, y: u32) -> u32 {
@@ -49,5 +49,5 @@ fn draw_points_u32(x: u32, y: u32) -> u32 {
 @compute
 @workgroup_size(8,8)
 fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
-    result[global_id.x*128u + global_id.y] = draw_points_u32(global_id.x, global_id.y);
+    result[global_id.x*512u + global_id.y] = draw_points_u32(global_id.x, global_id.y);
 }

@@ -14,7 +14,7 @@ const IMAGE_SIZE : usize = 2048;
 //const POINTS : [[usize; 2]; 7] = [[102, 1024], [449, 1745], [1229, 1922], [1854, 1424], [1854, 624], [1229, 126], [449, 303]];
 // const POINTS : [[usize; 2]; 4] = [[0, 0], [0, 512], [512, 512], [512, 0]];
 const POINTS : [[usize; 2]; 6] = [[450, 1316], [944, 1564], [822, 1332], [1040, 1738], [1492, 1372], [1294, 522]];
-const ITER : usize = 230_000_000;
+const ITER : usize = 300_000_000;
 const OUTPUT_FILE : &str = "./FRACTAL.png";
 
 
@@ -24,7 +24,7 @@ async fn main() {
     ffmpeg::init().unwrap();
 
     let mut video_frame = ffmpeg::util::frame::video::Video::new(
-        ffmpeg::format::Pixel::GRAY8,
+        ffmpeg::format::Pixel::RGB24,
         IMAGE_SIZE.try_into().unwrap(),
         IMAGE_SIZE.try_into().unwrap()
     );
@@ -32,6 +32,8 @@ async fn main() {
 
     let stride = dbg!(video_frame.stride(0));
     let image = video_frame.data_mut(0);
+
+    image.fill(255);
     
     draw_image_cpu(image, stride);
     
@@ -47,7 +49,7 @@ async fn main() {
     let mut encoder_ctx = ffmpeg::codec::Context::new().encoder().video().unwrap();
     encoder_ctx.set_width(IMAGE_SIZE as u32);
     encoder_ctx.set_height(IMAGE_SIZE as u32);
-    encoder_ctx.set_format(ffmpeg::format::Pixel::GRAY8);
+    encoder_ctx.set_format(ffmpeg::format::Pixel::RGB24);
     encoder_ctx.set_time_base((1,1));
 
     let mut encoder = encoder_ctx.open_as(encoder_codec).unwrap();
@@ -92,18 +94,22 @@ fn in_polygon(x: usize, y: usize) -> bool {
 
 fn draw_image_cpu(image: &mut [u8], stride: usize) {
 
-    //let mut cursor = [IMAGE_SIZE/2, IMAGE_SIZE/2];
-    let mut cursor = [IMAGE_SIZE/2, IMAGE_SIZE];
-    //let mut triangle : bool = false;
-
+    let mut cursor = [IMAGE_SIZE-1, IMAGE_SIZE/2];
+    let mut pixel : usize;
     for _i in 0..ITER {
-        image[(cursor[0])*stride + cursor[1]] = 
-            image[cursor[0]*stride + cursor[1]]
-                .checked_add(1)
-                .unwrap_or(u8::MAX);
-
-        // cursor = intermediate(cursor, POINTS[fastrand::usize(0..POINTS.len())]);
+        pixel = (cursor[0])*stride + cursor[1]*3;
+        change_color(&mut image.get_mut(pixel..(pixel+3)).unwrap());
         cursor = fern_next(cursor)
+    }
+}
+
+fn change_color(pixel: &mut [u8]) {
+    if pixel[0] > 0 {
+        pixel[0] -= 1;
+        pixel[2] -= 1;
+    }
+    else {
+        pixel[1] = pixel[1].checked_sub(1).unwrap_or(0);
     }
 }
 
@@ -114,10 +120,10 @@ fn intermediate(p1 : [usize; 2], p2 : [usize; 2]) -> [usize; 2] {
 fn fern_next([x,y] : [usize; 2]) -> [usize; 2] {
     let n = fastrand::u8(0..=u8::MAX);
     match n {
-        0..=2 =>     [16*x/100+1720, 1024],
-        3..=200 =>   [85*x/100+y*3/100-45, y*85/100+290-6*x/100],
-        201..=228 => [22*x/100+1411-y*13/100, y*20/100+43*x/100-68],
-        229..=255 => [24*x/100+1626-y*15/100, 2133-y*15/100-46*x/100],
+        0..=3 =>     [ 16*(100+(13*(x-100))%1848)/100+1636, 1024],
+        4..=200 =>   [85*x/100+y*24/1000-28, 283+y*85/100-667*x/10000],
+        201..=228 => [22*x/100+1365-y*138/1000, y*20/100+433*x/1000-25],
+        229..=255 => [24*x/100+1559-y*156/1000, 2086-y*15/100-467*x/1000],
     }
 }
 
