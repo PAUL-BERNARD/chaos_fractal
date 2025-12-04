@@ -9,3 +9,7 @@ def generate(n,size):
     return tableau
 
 print(generate(int(sys.argv[1]),int(sys.argv[2])))
+
+x = generate(int(sys.argv[1]),int(sys.argv[2]))
+print(f"    var vertices_x = array({'u, '.join([str(a[0]) for a in x])}u);")
+print(f"    var vertices_y = array({'u, '.join([str(a[1]) for a in x])}u);")
