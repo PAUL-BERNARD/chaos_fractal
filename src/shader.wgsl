@@ -1,38 +1,53 @@
-@group(0)
-@binding(0)
-var<storage, read_write> v_indices: array<u32>; // this is used as both input and output for convenience
+@group(0) @binding(0) var<storage, read> image: array<u32>;
+@group(0) @binding(1) var<storage, read_write> result: array<u32>;
 
-// The Collatz Conjecture states that for any integer n:
-// If n is even, n = n/2
-// If n is odd, n = 3n+1
-// And repeat this process for each new n, you will always eventually reach 1.
-// Though the conjecture has not been proven, no counterexample has ever been found.
-// This function returns how many times this recurrence needs to be applied to reach 1.
-fn collatz_iterations(n_base: u32) -> u32{
-    var n: u32 = n_base;
-    var i: u32 = 0u;
-    loop {
-        if (n <= 1u) {
-            break;
-        }
-        if (n % 2u == 0u) {
-            n = n / 2u;
-        }
-        else {
-            // Overflow? (i.e. 3*n + 1 > 0xffffffffu?)
-            if (n >= 1431655765u) {   // 0x55555555u
-                return 4294967295u;   // 0xffffffffu
-            }
 
-            n = 3u * n + 1u;
-        }
-        i = i + 1u;
+fn get_image_at(x: u32, y: u32) -> u32 {
+    if (x>=512u || y>=512u) {
+        return 0u;
     }
-    return n_base;
+
+    return (image[x*128u + (y/4u)] >> (8u*(y%4u))) % 256u;
+}
+
+fn get_value_at(x: u32, y: u32) -> u32 {
+    return (
+        get_image_at(x, y) +
+        get_image_at(x, y+1u) +
+        get_image_at(x+1u, y+1u) +
+        get_image_at(x+1u, y)
+    );
+}
+
+
+fn draw_points_u8(x: u32, y: u32) -> u32 {
+    var vertices_x = array(26u, 185u, 442u, 442u, 185u);
+    var vertices_y = array(256u, 475u, 391u, 121u, 37u);
+
+    var val: u32 = 0u;
+    for (var i:u32 = 0u; i < 5u; i++) {
+        if (2u*x >= vertices_x[i] && 2u*y >= vertices_y[i]) {
+            val += get_value_at(
+                x + x - vertices_x[i],
+                y + y - vertices_y[i]
+            );
+        }
+    }
+
+    // if (val > 0u) { return 255u;} else {return 0u;}
+    return min(val/5u, 255u);
+}
+
+fn draw_points_u32(x: u32, y: u32) -> u32 {
+    return
+         draw_points_u8(x, 4u*y) +
+        (draw_points_u8(x, 4u*y+1u) << 8u ) +
+        (draw_points_u8(x, 4u*y+2u) << 16u) +
+        (draw_points_u8(x, 4u*y+3u) << 24u) ;
 }
 
 @compute
-@workgroup_size(1)
+@workgroup_size(8,8)
 fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
-    v_indices[global_id.x] = collatz_iterations(v_indices[global_id.x]);
+    result[global_id.x*128u + global_id.y] = draw_points_u32(global_id.x, global_id.y);
 }
