@@ -2,13 +2,13 @@
 #![allow(dead_code)]
 
 use std::borrow::Cow;
+use std::time;
 
 use ffmpeg::codec::traits::Encoder;
 use ffmpeg_next as ffmpeg;
 use fastrand;
 use wgpu::util::DeviceExt;
 use tokio;
-use time;
 
 const IMAGE_SIZE : usize = 2048;
 // const POINTS : [[usize; 2]; 7] = [[102, 1024], [449, 1745], [1229, 1922], [1854, 1424], [1854, 624], [1229, 126], [449, 303]];
@@ -38,12 +38,12 @@ async fn main() {
     
     // draw_image_cpu(image, stride);
     let time =  time::Instant::now() - start;
-    println!("Before GPU : {time:.3}");
+    println!("Before GPU : {time:?}");
     
     draw_image_gpu(image, stride).await.unwrap();
 
     let time =  time::Instant::now() - start;
-    println!("After GPU : {time:.3}");
+    println!("After GPU : {time:?}");
 
     let mut output_ctx = ffmpeg::format::output(&OUTPUT_FILE)
         .unwrap();
@@ -72,7 +72,7 @@ async fn main() {
     output_ctx.write_trailer().unwrap();
 
     let time =  time::Instant::now() - start;
-    println!("Saving image : {time:.3}");
+    println!("Saving image : {time:?}");
 
 }
 
@@ -146,7 +146,7 @@ async fn draw_image_gpu(image: &mut [u8], stride: usize) -> Option<()> {
     // image.fill(255);
     fill_polygon(image, stride);
     let time =  time::Instant::now() - start;
-    println!("fill polygon : {time:.3}");
+    println!("fill polygon : {time:?}");
 
     // Create default WGPU instance
     let instance = wgpu::Instance::default();
@@ -255,7 +255,7 @@ async fn draw_image_gpu(image: &mut [u8], stride: usize) -> Option<()> {
 
 
     let time =  time::Instant::now() - start;
-    println!("Created bordel : {time:.3}");
+    println!("Created bordel : {time:?}");
 
     for i in 0..300 {
         {
@@ -280,7 +280,7 @@ async fn draw_image_gpu(image: &mut [u8], stride: usize) -> Option<()> {
         }
     }
     let time =  time::Instant::now() - start;
-    println!("iterated pipeline : {time:.3}");
+    println!("iterated pipeline : {time:?}");
 
     command_encoder.copy_buffer_to_buffer(
         &result_buffer,
