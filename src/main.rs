@@ -1,5 +1,5 @@
-#[allow(unused_variables)]
-#[allow(dead_code)]
+#![allow(unused_variables)]
+#![allow(dead_code)]
 
 use std::borrow::Cow;
 
@@ -93,7 +93,7 @@ fn in_polygon(x: usize, y: usize) -> bool {
 fn draw_image_cpu(image: &mut [u8], stride: usize) {
 
     //let mut cursor = [IMAGE_SIZE/2, IMAGE_SIZE/2];
-    let mut cursor = [0, 0];
+    let mut cursor = [IMAGE_SIZE/2, IMAGE_SIZE];
     //let mut triangle : bool = false;
 
     for _i in 0..ITER {
@@ -114,10 +114,10 @@ fn intermediate(p1 : [usize; 2], p2 : [usize; 2]) -> [usize; 2] {
 fn fern_next([x,y] : [usize; 2]) -> [usize; 2] {
     let n = fastrand::u8(0..=u8::MAX);
     match n {
-        0..=2 =>     [1024, 16*y/100+84],
-        3..=200 =>   [162+85*x/100-y*8/100, y*85/100+2*x/100+268],
-        201..=228 => [20*x/100+y*52/100+767, 469+y*22/100-12*x/100],
-        229..=255 => [1233-y*56/100-15*x/100, 284-13*x/100+y*24/100],
+        0..=2 =>     [16*x/100+1720, 1024],
+        3..=200 =>   [85*x/100+y*3/100-45, y*85/100+290-6*x/100],
+        201..=228 => [22*x/100+1411-y*13/100, y*20/100+43*x/100-68],
+        229..=255 => [24*x/100+1626-y*15/100, 2133-y*15/100-46*x/100],
     }
 }
 
