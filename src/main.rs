@@ -11,17 +11,16 @@ use wgpu::util::DeviceExt;
 use tokio;
 
 const IMAGE_SIZE : usize = 2048;
-// const POINTS : [[usize; 2]; 7] = [[102, 1024], [449, 1745], [1229, 1922], [1854, 1424], [1854, 624], [1229, 126], [449, 303]];
-const POINTS : [[usize; 2]; 5] = [[102, 1024], [739, 1900], [1770, 1566], [1770, 482], [739, 148]];
+const POINTS : [[usize; 2]; 7] = [[102, 1024], [449, 1745], [1229, 1922], [1854, 1424], [1854, 624], [1229, 126], [449, 303]];
+// const POINTS : [[usize; 2]; 5] = [[102, 1024], [739, 1900], [1770, 1566], [1770, 482], [739, 148]];
 // const POINTS : [[usize; 2]; 4] = [[0, 0], [0, 512], [512, 512], [512, 0]];
 // const POINTS : [[usize; 2]; 6] = [[450, 1316], [944, 1564], [822, 1332], [1040, 1738], [1492, 1372], [1294, 522]];
-const ITER : usize = 3_000;
+const ITER : usize = 300_000;
 const OUTPUT_FILE : &str = "./FRACTAL.png";
 
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
-    let start = time::Instant::now();
     ffmpeg::init().unwrap();
 
     let mut video_frame = ffmpeg::util::frame::video::Video::new(
@@ -36,21 +35,22 @@ async fn main() {
 
     image.fill(255);
     
-    // draw_image_cpu(image, stride);
-    let time =  time::Instant::now() - start;
-    println!("Before GPU : {time:?}");
+    draw_image_cpu(image, stride);
     
-    draw_image_gpu(image, stride).await.unwrap();
+    // draw_image_gpu(image, stride).await.unwrap();
 
-    let time =  time::Instant::now() - start;
-    println!("After GPU : {time:?}");
 
     let mut output_ctx = ffmpeg::format::output(&OUTPUT_FILE)
         .unwrap();
 
     let _ = output_ctx.add_stream(ffmpeg::encoder::find(ffmpeg::codec::Id::PNG).unwrap()).unwrap();
 
-    let encoder_codec : ffmpeg::codec::Video = ffmpeg::encoder::find(ffmpeg::codec::Id::PNG).unwrap().encoder().unwrap().video().unwrap();
+    let encoder_codec : ffmpeg::codec::Video = ffmpeg::encoder::find(ffmpeg::codec::Id::PNG)
+        .unwrap()
+        .encoder()
+        .unwrap()
+        .video()
+        .unwrap();
     
     let mut encoder_ctx = ffmpeg::codec::Context::new().encoder().video().unwrap();
     encoder_ctx.set_width(IMAGE_SIZE as u32);
@@ -70,9 +70,6 @@ async fn main() {
         encoded_image.write(&mut output_ctx).unwrap();
     }
     output_ctx.write_trailer().unwrap();
-
-    let time =  time::Instant::now() - start;
-    println!("Saving image : {time:?}");
 
 }
 
@@ -108,7 +105,7 @@ fn draw_image_cpu(image: &mut [u8], stride: usize) {
     for _i in 0..ITER {
         pixel = (cursor[0])*stride + cursor[1]*3;
         change_color(&mut image.get_mut(pixel..(pixel+3)).unwrap());
-        // cursor = fern_next(cursor)
+        cursor = fern_next(cursor);
         cursor = intermediate(cursor, POINTS[fastrand::usize(0..POINTS.len())]);
     }
 }
