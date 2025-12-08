@@ -6,9 +6,7 @@ use std::time;
 
 use ffmpeg::codec::traits::Encoder;
 use ffmpeg_next as ffmpeg;
-use fastrand;
 use wgpu::util::DeviceExt;
-use tokio;
 
 const IMAGE_SIZE : usize = 2048;
 const POINTS : [[usize; 2]; 7] = [[102, 1024], [449, 1745], [1229, 1922], [1854, 1424], [1854, 624], [1229, 126], [449, 303]];
@@ -38,7 +36,6 @@ async fn main() {
     draw_image_cpu(image, stride);
     
     // draw_image_gpu(image, stride).await.unwrap();
-
 
     let mut output_ctx = ffmpeg::format::output(&OUTPUT_FILE)
         .unwrap();
@@ -104,7 +101,7 @@ fn draw_image_cpu(image: &mut [u8], stride: usize) {
     let mut pixel : usize;
     for _i in 0..ITER {
         pixel = (cursor[0])*stride + cursor[1]*3;
-        change_color(&mut image.get_mut(pixel..(pixel+3)).unwrap());
+        change_color(image.get_mut(pixel..(pixel+3)).unwrap());
         cursor = fern_next(cursor);
         cursor = intermediate(cursor, POINTS[fastrand::usize(0..POINTS.len())]);
     }
@@ -116,12 +113,12 @@ fn change_color(pixel: &mut [u8]) {
         pixel[2] -= 1;
     }
     else {
-        pixel[1] = pixel[1].checked_sub(1).unwrap_or(0);
+        pixel[1] = pixel[1].saturating_sub(1);
     }
 }
 
 fn intermediate(p1 : [usize; 2], p2 : [usize; 2]) -> [usize; 2] {
-    return [(p1[0]+p2[0])/2, (p1[1]+p2[1])/2];
+    [(p1[0]+p2[0])/2, (p1[1]+p2[1])/2]
 }
 
 fn fern_next([x,y] : [usize; 2]) -> [usize; 2] {
