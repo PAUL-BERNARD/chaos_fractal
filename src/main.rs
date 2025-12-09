@@ -2,42 +2,60 @@
 #![allow(dead_code)]
 
 use std::borrow::Cow;
+use std::f32::consts::TAU;
 use std::time;
 
 use ffmpeg::codec::traits::Encoder;
 use ffmpeg_next as ffmpeg;
 use wgpu::util::DeviceExt;
+use clap::Parser;
 
-const IMAGE_SIZE : usize = 2048;
-const POINTS : [[usize; 2]; 7] = [[102, 1024], [449, 1745], [1229, 1922], [1854, 1424], [1854, 624], [1229, 126], [449, 303]];
-// const POINTS : [[usize; 2]; 5] = [[102, 1024], [739, 1900], [1770, 1566], [1770, 482], [739, 148]];
-// const POINTS : [[usize; 2]; 4] = [[0, 0], [0, 512], [512, 512], [512, 0]];
-// const POINTS : [[usize; 2]; 6] = [[450, 1316], [944, 1564], [822, 1332], [1040, 1738], [1492, 1372], [1294, 522]];
-const ITER : usize = 300_000_000;
-const OUTPUT_FILE : &str = "./FRACTAL.png";
-
+#[derive(Parser, Debug)]
+struct Args {
+    /// Filename of the output file
+    #[arg(short, long, default_value_t = {"./FRACTAL.png".to_string()})]
+    filename: String,
+    /// Number of edges of the polygon
+    #[arg(short, long, default_value_t = 5)]
+    edges: usize,
+    /// Width and height of the output image (in pixels)
+    #[arg(short, long, default_value_t = 2048)]
+    resolution: usize,
+    /// Number of iterations of the chaotic game steps
+    #[arg(short, long, default_value_t = 300_000_000)]
+    iterations: usize,
+}
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
+    // Argument parsing
+    let args = Args::parse();
+
+    let points = get_vertices(args.resolution, args.edges);
+
+    // Image initialization
     ffmpeg::init().unwrap();
 
     let mut video_frame = ffmpeg::util::frame::video::Video::new(
         ffmpeg::format::Pixel::RGB24,
-        IMAGE_SIZE.try_into().unwrap(),
-        IMAGE_SIZE.try_into().unwrap()
+        args.resolution.try_into().unwrap(),
+        args.resolution.try_into().unwrap()
     );
     video_frame.set_pts(Some(0));
 
     let stride = video_frame.stride(0);
     let image = video_frame.data_mut(0);
 
+    // Image drawing
     image.fill(255);
     
-    draw_image_cpu(image, stride);
+    draw_image_cpu(image, args.iterations, args.resolution, stride, &points);
     
     // draw_image_gpu(image, stride).await.unwrap();
 
-    let mut output_ctx = ffmpeg::format::output(&OUTPUT_FILE)
+    // Image saving
+
+    let mut output_ctx = ffmpeg::format::output(&args.filename)
         .unwrap();
 
     let _output_stream = output_ctx.add_stream(ffmpeg::encoder::find(ffmpeg::codec::Id::PNG).unwrap()).unwrap();
@@ -50,8 +68,8 @@ async fn main() {
         .unwrap();
     
     let mut encoder_ctx = ffmpeg::codec::Context::new().encoder().video().unwrap();
-    encoder_ctx.set_width(IMAGE_SIZE as u32);
-    encoder_ctx.set_height(IMAGE_SIZE as u32);
+    encoder_ctx.set_width(args.resolution as u32);
+    encoder_ctx.set_height(args.resolution as u32);
     encoder_ctx.set_format(ffmpeg::format::Pixel::RGB24);
     encoder_ctx.set_time_base((1,1));
 
@@ -70,10 +88,23 @@ async fn main() {
 
 }
 
-fn fill_polygon(image: &mut [u8], stride: usize) {
-    for x in 0..IMAGE_SIZE {
-        for y in 0..IMAGE_SIZE {
-            if in_polygon(x, y) {
+
+fn get_vertices(resolution: usize, sides: usize) -> Vec<[usize; 2]> {
+    let mut vertices = Vec::with_capacity(sides);
+    let radius = 0.9 * ((resolution as f32) / 2.0);
+    for i in 0..sides {
+        let angle = TAU * (i as f32) / (sides as f32);
+        let x = resolution as f32 / 2.0 - radius * angle.cos();
+        let y = resolution as f32 / 2.0 + radius * angle.sin();
+        vertices.push([x as usize, y as usize]);
+    }
+    vertices
+}
+
+fn fill_polygon(image: &mut [u8], resolution: usize, stride: usize, points: &Vec<[usize; 2]>) {
+    for x in 0..resolution {
+        for y in 0..resolution {
+            if in_polygon(x, y, points) {
                 image[x*stride + y] = 255;
             }
         }
@@ -81,11 +112,11 @@ fn fill_polygon(image: &mut [u8], stride: usize) {
 }
 
 
-fn in_polygon(x: usize, y: usize) -> bool {
+fn in_polygon(x: usize, y: usize, points: &Vec<[usize; 2]>) -> bool {
     // For each edge [v1, v2], we verify that ([x,y] - v1) × (v2 - v1) > 0
     // (or something like that) 
-    for i in 0..POINTS.len() {
-        let (v1, v2) = (POINTS[i], POINTS[(i+1)%POINTS.len()]);
+    for i in 0..points.len() {
+        let (v1, v2) = (points[i], points[(i+1)%points.len()]);
         if x*v1[1] + v1[0]*v2[1] + y*v2[0] > x*v2[1] + v1[1]*v2[0] + y*v1[0] {
             return false
         }
@@ -94,14 +125,14 @@ fn in_polygon(x: usize, y: usize) -> bool {
     true
 }
 
-fn draw_image_cpu(image: &mut [u8], stride: usize) {
-    let mut cursor = [IMAGE_SIZE/2, IMAGE_SIZE/2];
+fn draw_image_cpu(image: &mut [u8], iterations: usize, resolution: usize, stride: usize, points: &Vec<[usize; 2]>) {
+    let mut cursor = [resolution/2, resolution/2];
     let mut pixel : usize;
 
-    for _i in 0..ITER {
+    for _i in 0..iterations {
         change_color(image, cursor, stride);
-        cursor = fern_next(cursor);
-        // cursor = intermediate(cursor, POINTS[fastrand::usize(0..POINTS.len())]);
+        // cursor = fern_next(cursor);
+        cursor = intermediate(cursor, points[fastrand::usize(0..points.len())]);
     }
 }
 
@@ -127,14 +158,14 @@ fn fern_next([x,y] : [usize; 2]) -> [usize; 2] {
     }
 }
 
-async fn draw_image_gpu(image: &mut [u8], stride: usize) -> Option<()> {
+async fn draw_image_gpu(image: &mut [u8], resolution: usize, stride: usize, points: &Vec<[usize; 2]>) -> Option<()> {
     let start = time::Instant::now();
     // image[stride*(IMAGE_SIZE/2) + IMAGE_SIZE/2] = 1;
     // image[stride*(1+IMAGE_SIZE/2) + IMAGE_SIZE/2] = 1;
     // image[stride*(1+IMAGE_SIZE/2) + 1+IMAGE_SIZE/2] = 1;
     // image[stride*(IMAGE_SIZE/2) + 1+IMAGE_SIZE/2] = 1;
     // image.fill(255);
-    fill_polygon(image, stride);
+    fill_polygon(image, resolution, stride, points);
     let time =  time::Instant::now() - start;
     println!("fill polygon : {time:?}");
 
@@ -257,7 +288,7 @@ async fn draw_image_gpu(image: &mut [u8], stride: usize) -> Option<()> {
             compute_pass.set_pipeline(&pipeline);
             compute_pass.set_bind_group(0, &bind_group, &[]);
             compute_pass.insert_debug_marker(&format!("Compute pass {}", &i));
-            compute_pass.dispatch_workgroups((IMAGE_SIZE/8) as u32, (IMAGE_SIZE/(4*8)) as u32, 1);
+            compute_pass.dispatch_workgroups((resolution/8) as u32, (resolution/(4*8)) as u32, 1);
         }
         {
             command_encoder.copy_buffer_to_buffer(
