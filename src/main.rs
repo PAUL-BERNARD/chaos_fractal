@@ -13,7 +13,7 @@ const POINTS : [[usize; 2]; 7] = [[102, 1024], [449, 1745], [1229, 1922], [1854,
 // const POINTS : [[usize; 2]; 5] = [[102, 1024], [739, 1900], [1770, 1566], [1770, 482], [739, 148]];
 // const POINTS : [[usize; 2]; 4] = [[0, 0], [0, 512], [512, 512], [512, 0]];
 // const POINTS : [[usize; 2]; 6] = [[450, 1316], [944, 1564], [822, 1332], [1040, 1738], [1492, 1372], [1294, 522]];
-const ITER : usize = 300_000;
+const ITER : usize = 300_000_000;
 const OUTPUT_FILE : &str = "./FRACTAL.png";
 
 
@@ -40,7 +40,7 @@ async fn main() {
     let mut output_ctx = ffmpeg::format::output(&OUTPUT_FILE)
         .unwrap();
 
-    let _ = output_ctx.add_stream(ffmpeg::encoder::find(ffmpeg::codec::Id::PNG).unwrap()).unwrap();
+    let _output_stream = output_ctx.add_stream(ffmpeg::encoder::find(ffmpeg::codec::Id::PNG).unwrap()).unwrap();
 
     let encoder_codec : ffmpeg::codec::Video = ffmpeg::encoder::find(ffmpeg::codec::Id::PNG)
         .unwrap()
@@ -82,39 +82,35 @@ fn fill_polygon(image: &mut [u8], stride: usize) {
 
 
 fn in_polygon(x: usize, y: usize) -> bool {
+    // For each edge [v1, v2], we verify that ([x,y] - v1) × (v2 - v1) > 0
+    // (or something like that) 
     for i in 0..POINTS.len() {
-        if 
-            x*POINTS[i][1] + POINTS[i][0]*POINTS[(i+1)%POINTS.len()][1] + y*POINTS[(i+1)%POINTS.len()][0]
-            >
-            x*POINTS[(i+1)%POINTS.len()][1] + POINTS[i][1]*POINTS[(i+1)%POINTS.len()][0] + y*POINTS[i][0]
-            {
-                return false
-            }
+        let (v1, v2) = (POINTS[i], POINTS[(i+1)%POINTS.len()]);
+        if x*v1[1] + v1[0]*v2[1] + y*v2[0] > x*v2[1] + v1[1]*v2[0] + y*v1[0] {
+            return false
+        }
     }
 
     true
 }
 
 fn draw_image_cpu(image: &mut [u8], stride: usize) {
-
-    let mut cursor = [IMAGE_SIZE-1, IMAGE_SIZE/2];
+    let mut cursor = [IMAGE_SIZE/2, IMAGE_SIZE/2];
     let mut pixel : usize;
+
     for _i in 0..ITER {
-        pixel = (cursor[0])*stride + cursor[1]*3;
-        change_color(image.get_mut(pixel..(pixel+3)).unwrap());
+        change_color(image, cursor, stride);
         cursor = fern_next(cursor);
-        cursor = intermediate(cursor, POINTS[fastrand::usize(0..POINTS.len())]);
+        // cursor = intermediate(cursor, POINTS[fastrand::usize(0..POINTS.len())]);
     }
 }
 
-fn change_color(pixel: &mut [u8]) {
-    if pixel[0] > 0 {
-        pixel[0] -= 1;
-        pixel[2] -= 1;
-    }
-    else {
-        pixel[1] = pixel[1].saturating_sub(1);
-    }
+fn change_color(image: &mut [u8], cursor: [usize; 2], stride: usize) {
+    // Cursor pointer
+    let p = (cursor[0])*stride + cursor[1]*3;
+    image[p] = image[p].saturating_sub(1);
+    image[p + 1] = image[p + 1].saturating_sub(1);
+    image[p + 2] = image[p + 2].saturating_sub(1);
 }
 
 fn intermediate(p1 : [usize; 2], p2 : [usize; 2]) -> [usize; 2] {
@@ -124,8 +120,8 @@ fn intermediate(p1 : [usize; 2], p2 : [usize; 2]) -> [usize; 2] {
 fn fern_next([x,y] : [usize; 2]) -> [usize; 2] {
     let n = fastrand::u8(0..=u8::MAX);
     match n {
-        0..=3 =>     [ 16*(100+(13*(x-100))%1848)/100+1636, 1024],
-        4..=200 =>   [85*x/100+y*24/1000-28, 283+y*85/100-667*x/10000],
+        0..=3     => [ 16*(100+(13*(x-100))%1848)/100+1636, 1024],
+        4..=200   => [85*x/100+y*24/1000-28, 283+y*85/100-667*x/10000],
         201..=228 => [22*x/100+1365-y*138/1000, y*20/100+433*x/1000-25],
         229..=255 => [24*x/100+1559-y*156/1000, 2086-y*15/100-467*x/1000],
     }
