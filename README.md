@@ -2,6 +2,7 @@
 
 Implementation of chaos game fractals using Rust on CPU & GPU (wgpu).
 
+![Chaos game polygons, from 3 to 11 edges (excluding 4)](./chaos_game_polygon.png)
 
 ## Installation
 
